@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MileSpace 演出排程系統</title>
+<style>
+  :root {
+    --bg: #0f1115; --surface: #181c24; --surface-2: #222730; --border: #2c3240;
+    --text: #e8ecf1; --muted: #9ba3b4;
+    --accent: #ffb454; --accent-2: #5d9bff;
+    --good: #4ade80; --danger: #ef4444; --warn: #facc15;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 12px;}
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 0.5px;}
+  header h1 .badge { background: var(--accent); color: #1a1a1a; padding: 2px 8px; border-radius: 6px; font-size: 12px; margin-left:8px; vertical-align: middle;}
+  .cycle-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 24px; font-size: 14px; }
+  .cycle-bar .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px;}
+  .dot.green { background: var(--good); } .dot.red { background: var(--danger); }
+  .cloud-tag { font-size:12px; padding:4px 10px; background: rgba(74,222,128,0.15); border:1px solid rgba(74,222,128,0.4); color: #b6f5cb; border-radius: 999px; }
+  .cloud-tag.down { background: rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); color: #ffb3b3;}
+  .cloud-tag.loading { background: rgba(250,204,21,0.15); border:1px solid rgba(250,204,21,0.4); color: #fde68a;}
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px;}
+  .card h2 { margin: 0 0 14px 0; font-size: 17px; color: var(--accent);}
+  label { display:block; margin-bottom: 6px; font-size: 13px; color: var(--muted);}
+  input, select, button, textarea { font: inherit; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; width: 100%; outline: none; }
+  input:focus, select:focus { border-color: var(--accent-2); }
+  button { cursor: pointer; background: var(--accent); color: #1a1a1a; border: none; font-weight: 600;
+    transition: transform .05s ease, opacity .2s ease;}
+  button:hover { opacity: 0.9; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: 0.5; cursor: not-allowed;}
+  button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border);}
+  button.danger { background: var(--danger); color: #fff;}
+  button.ghost { background: transparent; color: var(--accent-2); border: 1px solid var(--border); padding: 4px 10px; font-size: 12px;}
+  .grid { display:grid; gap:14px;}
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 720px){ .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+  tr:hover td { background: rgba(255,255,255,0.02);}
+  .pill { display:inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .pill.rhythm { background: rgba(93,155,255,0.15); border-color: rgba(93,155,255,0.4); color: #aac8ff;}
+  .pill.voice  { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4); color: #b6f5cb;}
+  .pill.sax    { background: rgba(255,180,84,0.15); border-color: rgba(255,180,84,0.4); color: #ffd28a;}
+  .pill.trumpet{ background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ffb3b3;}
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color:#1a1a1a;
+    padding: 12px 20px; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); font-weight: 600;
+    opacity:0; transform: translateY(20px); transition: 0.3s; pointer-events: none; max-width: 80vw; z-index:9999;}
+  .toast.show { opacity: 1; transform: translateY(0);}
+  .toast.err { background: var(--danger); color: #fff;}
+  .empty { padding: 32px; text-align:center; color:var(--muted); font-size: 14px;}
+  .hidden { display:none !important; }
+  .row-actions { display:flex; gap:8px; flex-wrap: wrap;}
+  .toolbar { display:flex; gap:10px; flex-wrap: wrap; margin-bottom: 14px;}
+  .toolbar button { width:auto; padding: 8px 14px;}
+  details summary { cursor:pointer; color: var(--accent-2); font-size: 13px; padding: 6px 0;}
+  .legend { font-size: 12px; color: var(--muted); margin-top: 12px;}
+  .session-tag { font-size:12px; padding:4px 10px; background: var(--surface-2); border:1px solid var(--border); border-radius: 999px; color: var(--muted);}
+  .session-grid { display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));}
+  .session-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; cursor: pointer; transition: border-color .2s ease, background .2s ease;
+    user-select: none; position: relative; opacity: 0; transform: translateY(6px); animation: fadeIn .4s forwards; }
+  .session-card:hover { border-color: var(--accent-2); }
+  .session-card.checked { border-color: var(--accent); background: rgba(255,180,84,0.08);}
+  .session-card .tick { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px;
+    border-radius: 50%; border: 1.5px solid var(--border); display:flex; align-items:center;
+    justify-content:center; font-size: 13px; color: transparent;}
+  .session-card.checked .tick { background: var(--accent); border-color: var(--accent); color: #1a1a1a;}
+  .session-card .date { font-weight: 600; font-size: 15px; }
+  .session-card .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .session-card .place { font-size: 13px; margin-top: 2px; }
+  @keyframes fadeIn { to { opacity: 1; transform: translateY(0);} }
+  .summary-bar { display:flex; justify-content: space-between; align-items: center;
+    background: var(--surface-2); padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 14px;}
+  .session-list-row { display:flex; gap:6px; flex-wrap: wrap;}
+  .session-chip { background: rgba(93,155,255,0.15); border: 1px solid rgba(93,155,255,0.4);
+    color: #aac8ff; padding: 2px 8px; border-radius: 6px; font-size: 12px;}
+  .api-banner { background: linear-gradient(90deg, rgba(255,180,84,0.08), transparent);
+    border: 1px dashed rgba(255,180,84,0.4); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #ffd28a; }
+  .api-banner code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, "SF Mono", monospace;}
+  .spin { display:inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--muted); border-top-color: var(--accent);
+    border-radius: 50%; animation: rot 0.8s linear infinite; vertical-align: middle;}
+  @keyframes rot { to { transform: rotate(360deg); } }
+  footer { text-align:center; color: var(--muted); font-size: 12px; margin: 40px 0 20px; cursor: help;}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <h1>MileSpace 演出排程系統<span class="badge" id="monthTag">—</span></h1>
+    <div class="cloud-tag loading" id="cloudTag"><span class="spin"></span>&nbsp;連線中…</div>
+  </header>
+
+  <div class="api-banner" id="apiBanner">
+    ⚠️ <strong>部署提醒:</strong>請先把 <code>API_URL</code> 設定為你的 Google Apps Script 網址。
+    <span style="color:var(--muted);">(若你是管理員,直接打開網頁,系統不會要求;首次部署後請修改你的檔案)</span>
+  </div>
+
+  <div class="cycle-bar" id="cycleBar"></div>
+
+  <main id="musicianView">
+    <div class="card">
+      <h2>🗓️ 本月可登記場次</h2>
+      <p style="color:var(--muted); font-size:13px; margin-top:-8px;">
+        點擊場次卡片即可選擇(可複選);只需登記一次姓名與樂器,系統會把你勾選的場次全部紀錄起來。
+      </p>
+      <div id="publicSessionGrid"><div class="empty">載入場次中…</div></div>
+    </div>
+
+    <div class="card">
+      <h2>📝 樂手登記(一次性)</h2>
+      <div class="grid grid-2">
+        <div>
+          <label>姓名 *</label>
+          <input id="m_name" type="text" placeholder="請輸入你的名字" autocomplete="off">
+        </div>
+        <div>
+          <label>聯絡電話 (選填)</label>
+          <input id="m_phone" type="tel" placeholder="09xx-xxxxxx" autocomplete="off">
+        </div>
+        <div>
+          <label>樂器分類 *</label>
+          <select id="m_group">
+            <option value="">請選擇</option>
+            <option value="rhythm">節奏組</option>
+            <option value="instrument">樂器組</option>
+          </select>
+        </div>
+        <div>
+          <label>樂器 *</label>
+          <select id="m_instrument" disabled><option value="">請先選擇分類</option></select>
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <label>已選擇場次 <span style="color:var(--accent);" id="chosenCount">0</span> 場</label>
+        <div class="summary-bar">
+          <div id="chosenList" style="color:var(--muted); font-size:13px;">尚未選擇任何場次</div>
+          <button class="ghost" id="btnClearSelection">清空選擇</button>
+        </div>
+      </div>
+      <div class="row-actions" style="margin-top:18px;">
+        <button id="btnSubmitReg" disabled>送出登記</button>
+      </div>
+      <div class="legend">
+        * 節奏組 = 鋼琴 / 吉他 · 樂器組 = 歌手 / 薩克斯風 / 小號。<br>
+        * 每人只需登記一筆。日後想再加場次,只要回來點選新場次、再送出一次即可。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📋 已登記樂手 <span class="pill" id="regCount">0</span></h2>
+      <div class="toolbar">
+        <button class="secondary" id="btnMyReg">查詢我的報名</button>
+      </div>
+      <div id="regTableArea"><div class="empty">載入中…</div></div>
+    </div>
+  </main>
+
+  <section id="adminView" class="hidden">
+    <div class="card">
+      <h2>🔐 管理後台</h2>
+      <p style="color:var(--muted); font-size:13px;">已進入後台 (所有樂手在他們裝置上填寫,資料會自動彙整到這個 Google 試算表)。</p>
+
+      <h2 style="margin-top:24px;">新增場次</h2>
+      <div class="grid grid-3">
+        <div><label>日期</label><input id="a_date" type="date"></div>
+        <div><label>地點</label><input id="a_place" type="text" placeholder="例如: B1 酒吧"></div>
+        <div><label>時段</label><input id="a_time" type="text" placeholder="例如: 20:00–22:00"></div>
+      </div>
+      <div class="row-actions" style="margin-top:14px;">
+        <button id="btnAddSession">新增場次</button>
+        <button class="secondary" id="btnRefresh">重新整理資料</button>
+      </div>
+
+      <h2 style="margin-top:30px;">場次清單</h2>
+      <div id="adminSessionTable"></div>
+
+      <h2 style="margin-top:30px;">樂手登記清單</h2>
+      <div id="adminRegTable"></div>
+
+      <h2 style="margin-top:30px;">配對結果 <span class="pill" id="pairCount">0</span></h2>
+      <div class="toolbar">
+        <button id="btnRunPair">執行隨機配對</button>
+        <button id="btnRunPairAgain" class="secondary">重新配對</button>
+        <button id="btnExport" class="secondary">匯出 CSV 表格</button>
+      </div>
+      <div id="pairTable"></div>
+
+      <h2 style="margin-top:30px;">資料維護</h2>
+      <div class="row-actions" style="margin-top:8px;">
+        <button class="secondary" id="btnRunMonthlyReset">手動執行每月清除(測試)</button>
+        <button class="danger" id="btnWipe">清空全部資料</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>系統設定</h2>
+      <div class="grid grid-2">
+        <div>
+          <label>管理者密碼 (儲存於 Google Sheets 的 Config 分頁)</label>
+          <input id="adminPass" type="text" placeholder="預設 jam2026">
+        </div>
+        <div>
+          <label>API 設定</label>
+          <input id="apiUrlInput" type="text" placeholder="貼上 Google Apps Script 網址">
+        </div>
+      </div>
+      <div class="row-actions" style="margin-top:14px;">
+        <button class="secondary" id="btnSaveSettings">儲存設定</button>
+      </div>
+      <div class="legend">* 預設密碼為 <code>jam2026</code>。資料存於 Google Sheets · 此裝置只放設定(API URL + 密碼)。</div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+<footer>MileSpace 演出排程系統 · 雲端版 · 資料存於 Google Sheets · 頁尾點 5 下進入後台</footer>
+
+<script>
+/* ================================================================
+   MileSpace 演出排程系統 — 雲端版 (Google Sheets)
+   - 透過 Google Apps Script Web API 與 Sheets 溝通
+   - 樂手在自己裝置填寫 → 自動寫入同一份試算表
+   - 管理後台讀同一份試算表,即可看到所有樂手報名
+================================================================ */
+
+const SETTINGS_KEY = 'milespaceSettings_v1';
+const INSTRUMENTS = { rhythm: ['鋼琴','吉他'], instrument: ['歌手','薩克斯風','小號'] };
+
+const DEFAULT_SETTINGS = {
+  apiUrl: 'https://script.google.com/macros/s/AKfycbxREPLACE_ME_WITH_YOUR_DEPLOYMENT_URL/exec',
+  adminPass: 'jam2026'
+};
+
+let settings = loadSettings();
+let data = blankData();
+let chosenSessions = new Set();
+let currentRole = 'musician';
+
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const pad = n => String(n).padStart(2,'0');
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+const toggleConfirm = msg => confirm(msg);
+
+function loadSettings(){
+  try { return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
+  catch(e){ return Object.assign({}, DEFAULT_SETTINGS); }
+}
+function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); toast('設定已儲存到本機'); }
+
+function blankData(){
+  return { sessions: [], registrations: [], pairings: [], config: { adminPass:'jam2026' }, serverTime: null, lastResetMonth:'' };
+}
+
+function ui() {
+  return {
+    met: cycleStatus(),
+    isAdmin: currentRole === 'admin'
+  };
+}
+
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function groupName(g){ return g === 'rhythm' ? '節奏組' : '樂器組'; }
+function pillClass(g, inst){
+  if(g === 'rhythm') return 'rhythm';
+  if(inst === '歌手') return 'voice';
+  if(inst === '薩克斯風') return 'sax';
+  if(inst === '小號') return 'trumpet';
+  return '';
+}
+function sel(r, sid){ return Array.isArray(r.sessionIds) && r.sessionIds.includes(sid); }
+function toast(msg, isErr){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=> t.classList.remove('show'), isErr ? 4500 : 2400);
+}
+function setCloudTag(state, msg){
+  const el = $('#cloudTag');
+  el.className = 'cloud-tag ' + state + (state === 'loading' ? ' loading' : '');
+  el.innerHTML = (state === 'ok' ? '☁️ ' : state === 'err' ? '❌ ' : '') + msg;
+}
+function checkApiConfigured(){
+  if(!settings.apiUrl || settings.apiUrl.indexOf('REPLACE_ME') >= 0 || !/^https:\/\/script\.google\.com\//.test(settings.apiUrl)){
+    $('#apiBanner').classList.remove('hidden');
+    return false;
+  }
+  $('#apiBanner').classList.add('hidden');
+  return true;
+}
+
+/* ---------------- API 呼叫 ---------------- */
+async function apiGet(){
+  if(!checkApiConfigured()) throw new Error('尚未設定 API URL');
+  const url = settings.apiUrl + (settings.apiUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
+  const r = await fetch(url, { method:'GET', redirect:'follow' });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.json();
+}
+async function apiPost(action, payload){
+  if(!checkApiConfigured()) throw new Error('尚未設定 API URL');
+  const r = await fetch(settings.apiUrl, {
+    method:'POST',
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ action, payload }),
+    redirect:'follow'
+  });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.json();
+}
+async function loadData(){
+  setCloudTag('loading','連線中');
+  try {
+    const j = await apiGet();
+    if(!j.ok) throw new Error(j.error || 'API 回傳錯誤');
+    data = {
+      sessions: j.data.sessions || [],
+      registrations: j.data.registrations || [],
+      pairings: j.data.pairings || [],
+      config: j.data.config || { adminPass:'jam2026' },
+      serverTime: j.data.serverTime,
+      lastResetMonth: data.lastResetMonth
+    };
+    setCloudTag('ok','雲端已連線');
+    runMonthlyResetIfNeeded();
+    return true;
+  } catch(err){
+    setCloudTag('err','連線失敗: ' + err.message);
+    toast('無法連線到 Google Sheets: ' + err.message, true);
+    return false;
+  }
+}
+
+/* ---------------- 月份週期 ---------------- */
+function cycleStatus(){
+  const now = new Date();
+  return {
+    state: (now.getDate() >= 5 && now.getDate() < 30) ? 'open' : 'closed',
+    month: now.getFullYear() + '-' + pad(now.getMonth()+1),
+    day: now.getDate(),
+    daysInMonth: new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()
+  };
+}
+
+async function runMonthlyResetIfNeeded(){
+  const c = cycleStatus();
+  const today = (data.serverTime ? new Date(data.serverTime) : new Date());
+  const todayKey = today.getFullYear() + '-' + pad(today.getMonth()+1);
+  if(today.getDate() === 30 && data.lastResetMonth !== todayKey){
+    try {
+      const r = await apiPost('monthlyReset', {});
+      if(r.ok){
+        toast(`已自動清空 ${todayKey} 月份登記(${r.cleared} 筆)`);
+        await loadData();
+      }
+    } catch(e){ console.warn('monthlyReset 自動化失敗', e); }
+  }
+}
+
+function renderCycleBar(){
+  const c = cycleStatus();
+  const dot = c.state === 'open' ? '<span class="dot green"></span>' : '<span class="dot red"></span>';
+  const txt = c.state === 'open'
+    ? `${dot} 登記開放中(每月 5 號開放、30 號自動清除)`
+    : `${dot} 登記關閉(每月 5 號重新開放報名)`;
+  $('#cycleBar').innerHTML = `<div>${txt}</div>
+    <div style="margin-left:auto; color:var(--muted);">月份:<strong>${c.month}</strong> · 今日 ${c.day} 日 · 本月 ${c.daysInMonth} 天</div>`;
+  $('#monthTag').textContent = c.month;
+}
+
+/* ---------------- 樂手:場次 ---------------- */
+function renderPublicSessions(){
+  if(data.sessions.length === 0){
+    $('#publicSessionGrid').innerHTML = `<div class="empty">目前尚未建立任何場次。</div>`;
+    return;
+  }
+  $('#publicSessionGrid').innerHTML = `<div class="session-grid">${data.sessions.map(s => {
+    const c = chosenSessions.has(s.id);
+    return `<div class="session-card ${c?'checked':''}" data-sid="${escapeHtml(s.id)}" style="animation-delay:${Math.random()*200|0}ms">
+      <div class="tick">✓</div>
+      <div class="date">📅 ${escapeHtml(s.date)}</div>
+      <div class="place">📍 ${escapeHtml(s.place||'(未填地點)')}</div>
+      <div class="meta">🕒 ${escapeHtml(s.time||'')} · ${escapeHtml(s.monthKey||'')}</div>
+    </div>`;
+  }).join('')}</div>`;
+  $$('.session-card').forEach(el => {
+    el.addEventListener('click', () => toggleSession(el.dataset.sid));
+  });
+}
+function toggleSession(sid){
+  if(chosenSessions.has(sid)) chosenSessions.delete(sid); else chosenSessions.add(sid);
+  renderPublicSessions(); renderChosenBar();
+}
+function clearSelection(){ chosenSessions.clear(); renderPublicSessions(); renderChosenBar(); }
+function renderChosenBar(){
+  $('#chosenCount').textContent = chosenSessions.size;
+  if(chosenSessions.size === 0){
+    $('#chosenList').innerHTML = `<span style="color:var(--muted);">尚未選擇任何場次 — 點上方場次卡片可加入</span>`;
+    return;
+  }
+  $('#chosenList').innerHTML = `<div class="session-list-row">${Array.from(chosenSessions).map(sid => {
+    const s = data.sessions.find(x => x.id === sid);
+    return s ? `<span class="session-chip">${escapeHtml(s.date)} · ${escapeHtml(s.place||'-')}</span>` : '';
+  }).join('')}</div>`;
+}
+
+$('#m_group').addEventListener('change', e => {
+  const g = e.target.value;
+  const selEl = $('#m_instrument');
+  selEl.innerHTML = '<option value="">請選擇樂器</option>';
+  if(INSTRUMENTS[g]){
+    selEl.disabled = false;
+    INSTRUMENTS[g].forEach(i => selEl.add(new Option(i, i)));
+  } else { selEl.disabled = true; }
+});
+$('#btnClearSelection').addEventListener('click', clearSelection);
+
+$('#btnSubmitReg').addEventListener('click', async () => {
+  const name = $('#m_name').value.trim();
+  const group = $('#m_group').value;
+  const instrument = $('#m_instrument').value;
+  const phone = $('#m_phone').value.trim();
+  const sids = Array.from(chosenSessions);
+
+  if(!checkApiConfigured()){ toast('請先設定 API URL (見上方黃色提示)', true); return; }
+  if(!name){ toast('請填寫姓名'); return; }
+  if(!group){ toast('請選擇分類'); return; }
+  if(!instrument){ toast('請選擇樂器'); return; }
+  if(sids.length === 0){ toast('請至少勾選一個場次'); return; }
+  if(cycleStatus().state !== 'open'){ toast('目前非登記時段(每月 5 ~ 29 號開放)'); return; }
+
+  const btn = $('#btnSubmitReg');
+  btn.disabled = true; btn.textContent = '送出中…';
+
+  try {
+    const r = await apiPost('upsertRegistration', {
+      name, group, instrument, phone, sessionIds: sids, createdAt: new Date().toISOString()
+    });
+    if(!r.ok) throw new Error(r.error || '送出失敗');
+    toast(r.mode === 'merged' ? `已為「${name}」加 ${r.added||0} 個場次(共 ${(r.total||sids.length)} 場)` : `登記完成 ✅ 共 ${sids.length} 個場次`);
+    $('#m_name').value=''; $('#m_phone').value='';
+    $('#m_group').value=''; $('#m_instrument').innerHTML='<option value="">請先選擇分類</option>'; $('#m_instrument').disabled=true;
+    chosenSessions.clear(); renderPublicSessions(); renderChosenBar();
+    await loadData(); renderRegTable();
+  } catch(e){
+    toast('送出失敗: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '送出登記';
+  }
+});
+
+$('#btnMyReg').addEventListener('click', async () => {
+  const me = (prompt('請輸入你登記時的姓名:') || '').trim();
+  if(!me) return;
+  await loadData();
+  const mine = data.registrations.filter(r => r.name === me);
+  renderRegTable(mine);
+  toast(mine.length ? `找到 ${mine.length} 筆紀錄` : '找不到這個姓名的紀錄');
+});
+
+function renderRegTable(filterList){
+  const list = filterList !== undefined ? filterList : data.registrations;
+  $('#regCount').textContent = list.length;
+  if(list.length === 0){ $('#regTableArea').innerHTML = `<div class="empty">尚無報名資料</div>`; return; }
+  $('#regTableArea').innerHTML = `<table>
+    <thead><tr><th>姓名</th><th>分類</th><th>樂器</th><th>場次</th><th>電話</th><th>登記時間</th></tr></thead>
+    <tbody>${list.map(r => {
+      const chips = (r.sessionIds||[]).map(sid => {
+        const s = data.sessions.find(x => x.id === sid);
+        return s ? `<span class="session-chip">${escapeHtml(s.date)}</span>` : `<span class="session-chip">?(已刪除)</span>`;
+      }).join('') || `<span style="color:var(--muted); font-size:12px;">未選擇</span>`;
+      return `<tr>
+        <td><strong>${escapeHtml(r.name)}</strong></td>
+        <td><span class="pill ${pillClass(r.group, r.instrument)}">${groupName(r.group)}</span></td>
+        <td>${escapeHtml(r.instrument||'-')}</td>
+        <td><div class="session-list-row">${chips}</div></td>
+        <td>${escapeHtml(r.phone||'-')}</td>
+        <td style="color:var(--muted); font-size:12px;">${escapeHtml(r.createdAt ? new Date(r.createdAt).toLocaleString('zh-TW') : '-')}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+/* ---------------- 管理後台 ---------------- */
+function adminGate(){
+  const url = new URL(location.href);
+  if(url.searchParams.get('admin') !== '1') return;
+  const pass = prompt('請輸入管理者密碼:');
+  const cfg = data.config || { adminPass: 'jam2026' };
+  if(pass !== (cfg.adminPass || settings.adminPass || 'jam2026')){
+    toast('密碼錯誤', true);
+    return;
+  }
+  currentRole = 'admin';
+  $('#musicianView').classList.add('hidden');
+  $('#adminView').classList.remove('hidden');
+  $('#cloudTag').textContent = '管理模式';
+  $('#cloudTag').className = 'cloud-tag';
+  $('#cloudTag').innerHTML = '🔐 管理後台';
+  renderAdmin();
+}
+function renderAdmin(){
+  // 場次
+  $('#adminSessionTable').innerHTML = data.sessions.length === 0
+    ? `<div class="empty">尚未建立任何場次</div>`
+    : `<table><thead><tr><th>場次</th><th>月份</th><th>地點</th><th>時段</th><th>報名人數</th><th>動作</th></tr></thead>
+      <tbody>${data.sessions.map(s => {
+        const cnt = data.registrations.filter(r => sel(r, s.id)).length;
+        return `<tr><td><strong>${escapeHtml(s.date)}</strong></td>
+          <td><span class="pill">${escapeHtml(s.monthKey)}</span></td>
+          <td>${escapeHtml(s.place||'-')}</td>
+          <td>${escapeHtml(s.time||'-')}</td>
+          <td>${cnt} 人</td>
+          <td><button class="danger" style="width:auto;padding:4px 10px;font-size:12px;" onclick="adminDeleteSession('${escapeHtml(s.id)}')">刪除</button></td></tr>`;
+      }).join('')}</tbody></table>`;
+
+  // 樂手
+  $('#adminRegTable').innerHTML = data.registrations.length === 0
+    ? `<div class="empty">尚無報名資料</div>`
+    : `<table><thead><tr><th>姓名</th><th>分類</th><th>樂器</th><th>報名場次</th><th>電話</th><th>登記</th><th>動作</th></tr></thead>
+      <tbody>${data.registrations.map(r => {
+        const chips = (r.sessionIds||[]).map(sid => {
+          const s = data.sessions.find(x => x.id === sid);
+          return s ? `<span class="session-chip">${escapeHtml(s.date)}</span>` : '';
+        }).join('') || `<span style="color:var(--muted); font-size:12px;">未選擇</span>`;
+        return `<tr><td><strong>${escapeHtml(r.name)}</strong></td>
+          <td><span class="pill ${pillClass(r.group, r.instrument)}">${groupName(r.group)}</span></td>
+          <td>${escapeHtml(r.instrument||'-')}</td>
+          <td><div class="session-list-row">${chips}</div></td>
+          <td>${escapeHtml(r.phone||'-')}</td>
+          <td style="color:var(--muted); font-size:12px;">${escapeHtml(r.createdAt ? new Date(r.createdAt).toLocaleString('zh-TW') : '-')}</td>
+          <td><button class="danger" style="width:auto;padding:4px 10px;font-size:12px;" onclick="adminDeleteReg('${escapeHtml(r.id)}')">刪除</button></td></tr>`;
+      }).join('')}</tbody></table>`;
+
+  renderPairTable();
+  $('#adminPass').value = settings.adminPass || 'jam2026';
+  $('#apiUrlInput').value = settings.apiUrl || '';
+}
+
+window.adminDeleteSession = async function(id){
+  if(!confirm('確定刪除場次?(此場次會從所有樂手的報名中移除)')) return;
+  try {
+    const r = await apiPost('deleteSession', { id });
+    if(!r.ok) throw new Error(r.error);
+    toast('已刪除場次');
+    await loadData(); renderAdmin(); renderPublicSessions(); renderRegTable();
+  } catch(e){ toast('刪除失敗: ' + e.message, true); }
+};
+
+window.adminDeleteReg = async function(id){
+  if(!confirm('刪除這位樂手的登記?')) return;
+  try {
+    const r = await apiPost('deleteRegistration', { id });
+    if(!r.ok) throw new Error(r.error);
+    toast('已刪除登記');
+    await loadData(); renderAdmin(); renderRegTable();
+  } catch(e){ toast('刪除失敗: ' + e.message, true); }
+};
+
+$('#btnAddSession').addEventListener('click', async () => {
+  const date = $('#a_date').value;
+  const place = $('#a_place').value.trim();
+  const time = $('#a_time').value.trim();
+  if(!date){ toast('請選擇日期'); return; }
+  try {
+    const d = new Date(date);
+    const m = d.getFullYear() + '-' + pad(d.getMonth()+1);
+    const r = await apiPost('addSession', { date, place, time, monthKey: m });
+    if(!r.ok) throw new Error(r.error);
+    toast('已新增場次');
+    $('#a_date').value=''; $('#a_place').value=''; $('#a_time').value='';
+    await loadData(); renderAdmin(); renderPublicSessions();
+  } catch(e){ toast('新增失敗: ' + e.message, true); }
+});
+
+$('#btnRefresh').addEventListener('click', async () => {
+  await loadData(); renderAdmin(); renderPublicSessions(); renderRegTable();
+  toast('已重新整理');
+});
+
+$('#btnRunPair').addEventListener('click', async () => { await runPairing(); });
+$('#btnRunPairAgain').addEventListener('click', async () => {
+  if(!confirm('重新配對會覆蓋目前結果,確定嗎?')) return;
+  await runPairing();
+});
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+async function runPairing(){
+  try {
+    const newPairings = [];
+    data.sessions.forEach(s => {
+      const regs = data.registrations.filter(r => sel(r, s.id));
+      const rhythms = shuffle(regs.filter(r => r.group === 'rhythm'));
+      const insts   = shuffle(regs.filter(r => r.group === 'instrument'));
+      const pairs = Math.min(rhythms.length, insts.length);
+      for(let i=0;i<pairs;i++){
+        newPairings.push({
+          id: uid(),
+          sessionId: s.id,
+          rhythmRegId: rhythms[i].id,
+          instrumentRegId: insts[i].id,
+          pairedAt: new Date().toISOString()
+        });
+      }
+    });
+    const r = await apiPost('savePairings', { rows: newPairings });
+    if(!r.ok) throw new Error(r.error);
+    data.pairings = newPairings;
+    renderAdmin();
+    toast(`配對完成 🎲 共 ${r.count} 對`);
+  } catch(e){ toast('配對失敗: ' + e.message, true); }
+}
+
+function renderPairTable(){
+  $('#pairCount').textContent = data.pairings.length;
+  if(data.pairings.length === 0){
+    $('#pairTable').innerHTML = `<div class="empty">尚未配對,點「執行隨機配對」。</div>`;
+    return;
+  }
+  const rows = data.pairings.map(p => {
+    const s = data.sessions.find(x => x.id === p.sessionId) || {};
+    const rh = data.registrations.find(r => r.id === p.rhythmRegId) || {};
+    const inst = data.registrations.find(r => r.id === p.instrumentRegId) || {};
+    return `<tr>
+      <td>${escapeHtml(s.date||'-')}<br><small style="color:var(--muted);">${escapeHtml(s.time||'')}</small></td>
+      <td>${escapeHtml(s.place||'-')}</td>
+      <td><span class="pill rhythm">節奏組</span> <strong>${escapeHtml(rh.name||'?')}</strong> · ${escapeHtml(rh.instrument||'')}</td>
+      <td><span class="pill ${pillClass('instrument', inst.instrument)}">樂器組</span> <strong>${escapeHtml(inst.name||'?')}</strong> · ${escapeHtml(inst.instrument||'')}</td>
+      <td style="color:var(--muted); font-size:12px;">${escapeHtml(rh.phone||'')}<br>${escapeHtml(inst.phone||'')}</td>
+    </tr>`;
+  }).join('');
+
+  const orphans = data.sessions.flatMap(s => {
+    const regs = data.registrations.filter(r => sel(r, s.id));
+    const paired = new Set(data.pairings.filter(p=>p.sessionId===s.id).flatMap(p=>[p.rhythmRegId, p.instrumentRegId]));
+    return regs.filter(r => !paired.has(r.id)).map(r => ({ session:s, reg:r }));
+  });
+  $('#pairTable').innerHTML = `<table><thead><tr><th>場次</th><th>地點</th><th>節奏組</th><th>樂器組</th><th>電話</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    ${orphans.length ? `<details style="margin-top:16px;"><summary>未配對的樂手 (${orphans.length} 人)</summary>
+      <table style="margin-top:10px;"><thead><tr><th>場次</th><th>分類</th><th>姓名</th><th>樂器</th><th>電話</th></tr></thead>
+        <tbody>${orphans.map(o => `<tr>
+          <td>${escapeHtml(o.session.date)}</td>
+          <td><span class="pill ${pillClass(o.reg.group, o.reg.instrument)}">${groupName(o.reg.group)}</span></td>
+          <td>${escapeHtml(o.reg.name)}</td>
+          <td>${escapeHtml(o.reg.instrument)}</td>
+          <td>${escapeHtml(o.reg.phone||'-')}</td>
+        </tr>`).join('')}</tbody></table></details>` : ''}`;
+}
+
+$('#btnExport').addEventListener('click', () => {
+  if(data.pairings.length === 0 && !confirm('目前沒有配對結果,仍要匯出「完整樂手清單」嗎?')) return;
+  const lines = [];
+  if(data.pairings.length > 0){
+    lines.push(['場次日期','地點','時段','節奏組姓名','節奏組樂器','節奏組電話','樂器組姓名','樂器組樂器','樂器組電話','配對時間'].map(csvCell).join(','));
+    data.pairings.forEach(p => {
+      const s = data.sessions.find(x => x.id === p.sessionId) || {};
+      const rh = data.registrations.find(r => r.id === p.rhythmRegId) || {};
+      const inst = data.registrations.find(r => r.id === p.instrumentRegId) || {};
+      lines.push([s.date, s.place||'', s.time||'', rh.name||'', rh.instrument||'', rh.phone||'',
+        inst.name||'', inst.instrument||'', inst.phone||'', new Date(p.pairedAt).toLocaleString('zh-TW')].map(csvCell).join(','));
+    });
+  } else {
+    lines.push(['場次日期','場次地點','場次時段','姓名','分類','樂器','電話','登記時間'].map(csvCell).join(','));
+    data.registrations.forEach(r => {
+      (r.sessionIds||[]).forEach(sid => {
+        const s = data.sessions.find(x => x.id === sid);
+        if(!s) return;
+        lines.push([s.date, s.place||'', s.time||'', r.name, groupName(r.group), r.instrument, r.phone||'',
+          r.createdAt ? new Date(r.createdAt).toLocaleString('zh-TW') : ''].map(csvCell).join(','));
+      });
+    });
+  }
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href = URL.createObjectURL(blob);
+  a.download = `milespace-${stamp}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('已匯出 CSV 表格');
+});
+function csvCell(v){ const s = String(v??''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
+
+$('#btnRunMonthlyReset').addEventListener('click', async () => {
+  if(!confirm('本月所有場次的樂手登記會被清除(配對也會重置)?')) return;
+  try {
+    const r = await apiPost('monthlyReset', {});
+    if(!r.ok) throw new Error(r.error);
+    toast(`已清除 ${r.cleared} 筆登記`);
+    await loadData(); renderAdmin(); renderPublicSessions(); renderRegTable();
+  } catch(e){ toast('清除失敗: ' + e.message, true); }
+});
+
+$('#btnWipe').addEventListener('click', async () => {
+  if(!confirm('⚠️ 真的清空所有資料嗎?(場次/登記/配對全部消失)')) return;
+  try {
+    const r = await apiPost('wipeAll', {});
+    if(!r.ok) throw new Error(r.error);
+    toast('已清空');
+    await loadData(); renderAdmin(); renderPublicSessions(); renderRegTable();
+  } catch(e){ toast('清空失敗: ' + e.message, true); }
+});
+
+/* ---------------- 設定 ---------------- */
+$('#btnSaveSettings').addEventListener('click', () => {
+  settings.apiUrl = $('#apiUrlInput').value.trim() || settings.apiUrl;
+  settings.adminPass = $('#adminPass').value.trim() || settings.adminPass;
+  saveSettings();
+  apiPost('updateAdminPass', { password: settings.adminPass })
+    .then(r => toast(r.ok ? '密碼已同步到 Google Sheets' : '密碼僅儲存在本機', !r.ok))
+    .catch(() => toast('密碼僅儲存在本機(API 未連線)', true));
+  loadData().then(() => { renderPublicSessions(); renderRegTable(); });
+});
+
+/* ---------------- 隱藏入口:頁尾快速點 5 下 ---------------- */
+(function(){
+  let clicks = 0, last = 0;
+  const f = document.querySelector('footer');
+  if(!f) return;
+  f.addEventListener('click', async () => {
+    const n = Date.now();
+    if(n - last < 800) clicks++; else clicks = 1;
+    last = n;
+    if(clicks >= 5){
+      clicks = 0;
+      await loadData();
+      const pass = prompt('請輸入管理者密碼:');
+      const adminPass = (data.config && data.config.adminPass) || settings.adminPass;
+      if(pass !== adminPass){ toast('密碼錯誤', true); return; }
+      currentRole = 'admin';
+      $('#musicianView').classList.add('hidden');
+      $('#adminView').classList.remove('hidden');
+      $('#cloudTag').className = 'cloud-tag';
+      $('#cloudTag').innerHTML = '🔐 管理後台';
+      renderAdmin();
+    }
+  });
+})();
+
+/* ---------------- URL 進入 ---------------- */
+async function tryUrlAdmin(){
+  const url = new URL(location.href);
+  if(url.searchParams.get('admin') !== '1') return false;
+  await loadData();
+  const pass = prompt('請輸入管理者密碼:');
+  const adminPass = (data.config && data.config.adminPass) || settings.adminPass;
+  if(pass !== adminPass){ toast('密碼錯誤', true); return true; }
+  currentRole = 'admin';
+  $('#musicianView').classList.add('hidden');
+  $('#adminView').classList.remove('hidden');
+  $('#cloudTag').className = 'cloud-tag';
+  $('#cloudTag').innerHTML = '🔐 管理後台';
+  renderAdmin();
+  return true;
+}
+
+/* ---------------- 啟動 ---------------- */
+(async function boot(){
+  renderCycleBar();
+  checkApiConfigured();
+  $('#apiUrlInput').value = settings.apiUrl;
+  $('#adminPass').value = settings.adminPass;
+  const ok = await loadData();
+  if(ok){
+    chosenSessions.clear();
+    renderPublicSessions(); renderChosenBar(); renderRegTable();
+    $('#btnSubmitReg').disabled = false;
+  } else {
+    $('#btnSubmitReg').disabled = true;
+  }
+  await tryUrlAdmin();
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+</body>
+</html>
