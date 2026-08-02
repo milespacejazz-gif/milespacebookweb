@@ -363,7 +363,7 @@ const c = cycleStatus();
 const dot = c.state === 'open' ? '<span class="dot green"></span>' : '<span class="dot red"></span>';
 const txt = c.state === 'open'
 ? `${dot} 登記開放中(每月 7 號開放、21 號截止)`
-: `${dot} 登記關閉(下個月 7 號重新開放報名)`;
+: `${dot} 登記關閉(每個月 7 號重新開放報名)`;
 $('#cycleBar').innerHTML = `<div>${txt}</div>
 <div style="margin-left:auto; color:var(--muted);">月份:<strong>${c.month}</strong> · 今日 ${c.day} 日 · 本月 ${c.daysInMonth} 天</div>`;
 $('#monthTag').textContent = c.month;
